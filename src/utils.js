@@ -8,6 +8,8 @@ const SPRINT_SPEED = 5.25;
 const LATERAL_SPEED = 3.0;
 
 const ANIM_FADE_DURATION = 0.2; // in seconds
+const SPRINT_ANIMATION_SPEED = SPRINT_SPEED / DEFAULT_SPEED; 
+const MODEL_OFFSET_Y = 0.05;
 
 export class Player {
     constructor(params) {
@@ -24,7 +26,7 @@ export class Player {
         this.mixer = null;          // THREE.AnimationMixer
         this.animations = new Map(); // Store clips by name <string, THREE.AnimationClip>
         this.actions = new Map();   // Store actions by name <string, THREE.AnimationAction>
-        this.currentState = 'idle'; // Track current animation state ('idle', 'walk', 'run', 'wave')
+        this.currentState = 'bananaBones|idle'; // Track current animation state ('idle', 'walk', 'run', 'wave')
         this.currentAction = null;  // The currently playing THREE.AnimationAction
 
         // Physics
@@ -68,11 +70,8 @@ export class Player {
                     this.actions.set(clip.name, this.mixer.clipAction(clip));
                 });
 
-                // --- IMPORTANT ---
-                // You MUST know the exact names of your animations in the GLTF file.
-                // Replace these string keys ('Idle', 'Walk', 'Run', 'Wave')
-                // with the actual names logged above if they are different.
-                this.currentAction = this.actions.get('bananaBones|idle'); // <<<--- CHECK NAME! Default to Idle
+                // MUST know the exact names of your animations in the GLTF file.
+                this.currentAction = this.actions.get('bananaBones|idle'); // idle
                 if (this.currentAction) {
                      this.currentAction.play();
                 } else {
@@ -103,17 +102,17 @@ export class Player {
         }
         console.log('Initializing player physics...');
 
-        // Calculate capsule properties
+        // capsule properties
         this.capsuleInfo.halfHeight = this.capsuleInfo.height / 2;
-        this.capsuleInfo.offsetY = -this.capsuleInfo.halfHeight - this.capsuleInfo.radius + 0.05; // Offset for mesh position
+        this.capsuleInfo.offsetY = -this.capsuleInfo.halfHeight - this.capsuleInfo.radius + MODEL_OFFSET_Y; // Offset for mesh position
 
         let rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-            .setTranslation(5.0, 15.0, 5.0) // Start high
+            .setTranslation(5.0, 10.0, 5.0)
             .setLinearDamping(0.1)
             .setAngularDamping(1.0);
 
         this.playerBody = this.world.createRigidBody(rigidBodyDesc);
-        this.playerBody.lockRotations(true); // Prevent tipping
+        this.playerBody.lockRotations(true);
 
         let colliderDesc = RAPIER.ColliderDesc.capsule(
             this.capsuleInfo.halfHeight,
@@ -131,13 +130,13 @@ export class Player {
             return;
         }
 
-        // --- 1. Update Animation Mixer ---
+        // update animation mixer
         this.mixer.update(deltaTime);
 
-        // --- 2. Determine Movement and Target State ---
+        // determine movement and target state
         this.direction.set(0, 0, 0);
         let targetSpeed = 0;
-        let nextState = 'Idle'; // Default to Idle <<<--- CHECK NAME!
+        let nextState = 'bananaBones|idle'; // Default to Idle <<<--- CHECK NAME!
 
         if (input.forward) this.direction.z += 1;
         if (input.backward) this.direction.z -= 1;
@@ -151,46 +150,45 @@ export class Player {
             // Determine speed and animation state based on input
             if (input.sprint && input.forward) {
                 targetSpeed = SPRINT_SPEED;
-                nextState = 'bananaBones|walk'; // <<<--- CHECK NAME!
+                nextState = 'bananaBones|walk'; // run
             } else if (input.forward || input.left || input.right || input.backward) {
                  // Use walk speed if moving forward without sprint OR moving laterally/backward
                  targetSpeed = (input.left || input.right || input.backward) ? LATERAL_SPEED : DEFAULT_SPEED;
-                 nextState = 'bananaBones|walk'; // <<<--- CHECK NAME!
+                 nextState = 'bananaBones|walk'; // walk
             }
         } else {
             targetSpeed = 0;
-            nextState = 'bananaBones|idle'; // <<<--- CHECK NAME!
+            nextState = 'bananaBones|idle'; // idle
         }
 
-        // Handle Wave Emote (Example using 'E' key - requires InputController update)
-        if (input.wave) { // Assuming 'wave' boolean exists in input
-             nextState = 'bananaBones|hiiiiiiiii'; // <<<--- CHECK NAME!
-             // Make sure wave input is consumed so it doesn't spam
+        // other animations
+        if (input.wave) {
+             nextState = 'bananaBones|hiiiiiiiii'; // wave
              input.wave = false; // Reset wave trigger in the input controller after use
         }
 
-        // --- 3. Apply Velocity to Physics Body ---
+        // Physics 
         this.velocity.copy(this.direction).multiplyScalar(targetSpeed);
         let currentVelocity = this.playerBody.linvel();
         this.playerBody.setLinvel({x: this.velocity.x, y: currentVelocity.y, z: this.velocity.z}, true);
 
-        // --- 4. Sync Visual Mesh Position (with Offset) ---
+        // Sync visual mesh with rapier.js world
         const pos = this.playerBody.translation();
-        this.position.set( // Update internal position tracker
+        this.position.set(
             pos.x,
             pos.y + this.capsuleInfo.offsetY,
             pos.z
         );
-        this.mesh.position.copy(this.position); // Copy to mesh
+        this.mesh.position.copy(this.position);
 
-        // --- 5. Update Visual Rotation (Optional - Face Movement Direction) ---
+        // update facing direction
         if (isMoving) {
             const angle = Math.atan2(this.direction.x, this.direction.z);
             const targetQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
             this.mesh.quaternion.slerp(targetQuaternion, 0.15);
         }
 
-        // --- 6. Transition Animations ---
+        // transition animations
         if (this.currentState !== nextState) {
             this.playAnimation(nextState);
             this.currentState = nextState;
@@ -204,51 +202,52 @@ export class Player {
             return;
         }
 
-        // Ensure currentAction exists before trying to fade it out
+        // fade out current action
         if (this.currentAction && this.currentAction !== nextAction) {
-            // Fade out the current action
             this.currentAction.fadeOut(ANIM_FADE_DURATION);
         }
 
+        let timeScale = 1;
+
+
         // Set up and fade in the next action
         nextAction
-            .reset() // Reset the animation to the beginning
+            .reset()
             .setEffectiveTimeScale(1)
             .setEffectiveWeight(1)
             .fadeIn(ANIM_FADE_DURATION)
             .play();
 
-        // Handle one-shot animations like 'Wave'
-        // ASSUMPTION: Looping animations are 'Idle', 'Walk', 'Run'
-        if (name === 'bananaBones|hiiiiiiiii') { // <<<--- CHECK NAME!
+        
+
+        // handle 'emotes'
+        if (name === 'bananaBones|hiiiiiiiii') { // wave
             nextAction.setLoop(THREE.LoopOnce, 1);
             nextAction.clampWhenFinished = true; // Prevent flickering when finished
 
-            // --- IMPORTANT: Transition back after wave finishes ---
-            // Use a listener to switch back to Idle (or previous state)
+            // transition back after wave finishes
             const listener = (event) => {
                 if (event.action === nextAction) {
                     // Don't transition if we were interrupted by another state change
                     if (this.currentState === 'bananaBones|hiiiiiiiii') {
                         console.log("Wave finished, returning to Idle");
-                        this.playAnimation('bananaBones|idle'); // <<<--- CHECK NAME!
-                        this.currentState = 'bananaBones|idle'; // <<<--- CHECK NAME!
+                        this.playAnimation('bananaBones|idle'); // idle
+                        this.currentState = 'bananaBones|idle'; // idle
                     }
-                    this.mixer.removeEventListener('finished', listener); // Clean up listener
+                    this.mixer.removeEventListener('finished', listener);
                 }
             };
             this.mixer.addEventListener('finished', listener);
 
         } else {
-            // Ensure looping animations loop correctly
              nextAction.setLoop(THREE.LoopRepeat);
-             nextAction.clampWhenFinished = false; // Allow looping
+             nextAction.clampWhenFinished = false; // allow looping
         }
 
         this.currentAction = nextAction;
     }
 
-    // Return the position of the physics body (capsule center)
+    // Return position of the physics body (capsule center)
     getPosition() {
         return this.playerBody ? this.playerBody.translation() : new THREE.Vector3(5, 15, 5); // Estimate if not ready
     }
@@ -259,7 +258,6 @@ export class Player {
     }
 }
 
-// --- Update InputController to handle 'Wave' ---
 export class InputController {
     constructor() {
         this.forward = false;
@@ -271,10 +269,17 @@ export class InputController {
 
         window.addEventListener('keydown', (event) => this.onKeyDown(event, true) );
         window.addEventListener('keyup', (event) => this.onKeyDown(event, false) );
+        window.addEventListener('keypress', (event) => {
+            if (event.code === 'KeyG' && !this.wave) {
+                this.wave = true;
+                return;
+            }
+        })
     }
 
 
     onKeyDown(event, state) {
+        /*
         // Only trigger wave on key down (state is true)
         // and prevent holding the key down from re-triggering
         if (event.code === 'KeyG' && state && !this.wave) {
@@ -286,6 +291,7 @@ export class InputController {
         if (event.code === 'KeyG' && !state) {
             // this.wave = false; // Resetting here might be too early, let player update handle it.
         }
+            */
 
         // Handle movement keys (allow moving while waving starts)
         switch (event.code) {

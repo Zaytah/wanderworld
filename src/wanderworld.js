@@ -9,7 +9,7 @@ import { ChunkManager } from './terrain.js';
 import { Player, InputController } from './utils.js';
 import { ThirdPersonCamera } from './ThirdPersonCamera.js';
 
-const DEBUG = true;
+const DEBUG = false;
 
 let scene, camera, renderer, world;
 let sky, sun, elevation, azimuth;
