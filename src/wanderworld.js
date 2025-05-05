@@ -13,6 +13,7 @@ import { ThirdPersonCamera } from './ThirdPersonCamera.js';
 let scene, camera, renderer, world;
 let sky, sun, elevation, azimuth;
 let player, chunkManager, cameraSystem, input;
+let debugMaterial, debugGeometry, debugMesh;
 
 const clock = new THREE.Clock();
 const PLAYER_MODEL_SCALE = 0.005;
@@ -110,12 +111,19 @@ function scenery() {
     const geometry = new THREE.BoxGeometry( 1, 1, 1 );
     const material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
     const cube = new THREE.Mesh( geometry, material );
+    cube.position.set(5, 0, 5);
     scene.add( cube );
 
     let rigidBodyDesc = RAPIER.RigidBodyDesc.fixed();
     let cubeBody = world.createRigidBody(rigidBodyDesc);
     let colliderDesc = RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5);
     world.createCollider(colliderDesc, cubeBody);
+
+    debugMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, vertexColors: true });
+    debugGeometry = new THREE.BufferGeometry();
+    debugMesh = new THREE.LineSegments(debugGeometry, debugMaterial);
+debugMesh.frustumCulled = false; // Prevent it from being culled by the camera
+scene.add(debugMesh);
 
 }
 
@@ -131,6 +139,7 @@ function animate() {
         if (cameraSystem) cameraSystem.update(timeElapsed);
         animateSky();
         animate();
+        updateDebug();
 
     });
 }
@@ -158,3 +167,17 @@ window.addEventListener('click', () => {
 window.addEventListener('DOMContentLoaded', () => {
     runApp();
 });
+
+
+
+// Update the debug shapes in your animation loop
+function updateDebug() {
+  const { vertices, colors } = world.debugRender(); // Get the vertices and colors for debug shapes
+
+  // Update the geometry with the new vertices and colors
+  debugGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+  debugGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
+
+  // Set the visibility of the debug mesh based on your needs
+  debugMesh.visible = true;  // You can toggle this based on a debug flag
+}

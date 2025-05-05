@@ -11,6 +11,7 @@ export class Player {
         this.mesh = null;
         this.velocity = new THREE.Vector3();
         this.direction = new THREE.Vector3();
+        this.mixer = null;
         this.speed = DEFAULT_SPEED;
         this.scale = params.scale;
         this.world = params.world;
@@ -22,12 +23,22 @@ export class Player {
         const loader = new GLTFLoader();
         const size = new THREE.Vector3(params.scale, params.scale, params.scale);
         loader.load(
-            'public/models/low-poly_sekiro/scene.gltf',
+            'public/models/bananacat/scene.gltf',
             (gltf) => {
                 this.mesh = gltf.scene;
-                this.mesh.scale.set(size.x, size.y, size.z);
-                this.mesh.position.set(0, 0, 0);
+                this.mesh.scale.set(1, 1, 1);
+                this.mesh.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material.color = new THREE.Color(1.5, 1.5, 1.5);
+                        child.castShadow = true;
+                    }
+                });
+                this.mesh.position.set(5, 0, 5);
                 this.position = this.mesh.position;
+                const gltfAnimations = gltf.animations;
+                this.mixer = new THREE.AnimationMixer(this.mesh);
+                const animationsMap = new Map();
+                
                 params.scene.add(this.mesh);
                 this.initPhysics();
             },
@@ -67,11 +78,15 @@ export class Player {
     }
 
     initPhysics() {
+        const playerHeight = 1.6;
+        const playerRadius = 0.3;
         let rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-            .setTranslation(0.0, 3.0, 0.0);
+            .setTranslation(5.0, 3.0, 5.0)
+            .setLinearDamping(0.1)
+            .setAngularDamping(1.0);
         this.playerBody = this.world.createRigidBody(rigidBodyDesc);
         this.playerBody.setEnabledRotations(false, false, false);
-        let colliderDesc = RAPIER.ColliderDesc.capsule(this.scale / 2, this.scale / 2);
+        let colliderDesc = RAPIER.ColliderDesc.capsule(playerHeight / 2, playerRadius);
         this.world.createCollider(colliderDesc, this.playerBody);
     }
 
