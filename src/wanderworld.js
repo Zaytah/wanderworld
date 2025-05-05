@@ -9,6 +9,7 @@ import { ChunkManager } from './terrain.js';
 import { Player, InputController } from './utils.js';
 import { ThirdPersonCamera } from './ThirdPersonCamera.js';
 
+const DEBUG = true;
 
 let scene, camera, renderer, world;
 let sky, sun, elevation, azimuth;
@@ -16,12 +17,12 @@ let player, chunkManager, cameraSystem, input;
 let debugMaterial, debugGeometry, debugMesh;
 
 const clock = new THREE.Clock();
-const PLAYER_MODEL_SCALE = 0.005;
+const PLAYER_MODEL_SCALE = 1;
 
 async function runApp() {
     await RAPIER.init();
-
-    init();
+    await init();
+    animate();
 }
 
 async function init() {
@@ -51,7 +52,7 @@ async function init() {
 
     lighting();
     scenery();
-    renderer.setAnimationLoop(animate());
+    // renderer.setAnimationLoop(animate());
 }
 
 function lighting() {
@@ -119,29 +120,33 @@ function scenery() {
     let colliderDesc = RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5);
     world.createCollider(colliderDesc, cubeBody);
 
-    debugMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, vertexColors: true });
-    debugGeometry = new THREE.BufferGeometry();
-    debugMesh = new THREE.LineSegments(debugGeometry, debugMaterial);
-debugMesh.frustumCulled = false; // Prevent it from being culled by the camera
-scene.add(debugMesh);
+    if (DEBUG) {
+        debugMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, vertexColors: true });
+        debugGeometry = new THREE.BufferGeometry();
+        debugMesh = new THREE.LineSegments(debugGeometry, debugMaterial);
+        debugMesh.frustumCulled = false; // Prevent it from being culled by the camera
+        scene.add(debugMesh);
+    }
 
 }
 
 
 function animate() {
 
-    requestAnimationFrame(() => {
-        const timeElapsed = clock.getDelta();
+    requestAnimationFrame(animate);
+
+        const dt = clock.getDelta();
         world.step();
         if (chunkManager) chunkManager.update();
-        renderer.render(scene, camera);
-        if (player.mesh) player.update(input);
-        if (cameraSystem) cameraSystem.update(timeElapsed);
+        if (player && player.mesh && player.playerBody) player.update(input, dt);
+        if (cameraSystem) cameraSystem.update(dt);
         animateSky();
-        animate();
-        updateDebug();
+        renderer.render(scene, camera);
 
-    });
+        if (DEBUG) {
+            updateDebug();
+        }
+        
 }
 
 function animateSky() {

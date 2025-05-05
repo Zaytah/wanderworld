@@ -28,7 +28,7 @@ export class ThirdPersonCamera {
             const movementX = e.movementX || 0;
             const movementY = e.movementY || 0;
 
-            const sensitivity = 0.001;
+            const sensitivity = 0.003;
             this.rotation.y -= movementX * sensitivity;
             this.rotation.x -= movementY * sensitivity;
 
