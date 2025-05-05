@@ -1,31 +1,33 @@
 import * as THREE from 'three';
 import WebGL from 'three/addons/capabilities/WebGL.js';
+import RAPIER from '@dimforge/rapier3d-compat'
+import wasmUrl from '@dimforge/rapier3d/rapier_wasm3d_bg.wasm?url';
 
-import { OrbitControls } from 'three/examples/jsm/Addons.js';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 
 import { ChunkManager } from './terrain.js';
 import { Player, InputController } from './utils.js';
+import { ThirdPersonCamera } from './ThirdPersonCamera.js';
 
 
-let scene, camera, renderer, controls;
+let scene, camera, renderer, world;
 let sky, sun, elevation, azimuth;
-let player, chunkManager, input;
+let player, chunkManager, cameraSystem, input;
 
 const clock = new THREE.Clock();
 const PLAYER_MODEL_SCALE = 0.005;
 
-function runApp() {
+async function runApp() {
+    await RAPIER.init();
+
     init();
 }
 
-function init() {
+async function init() {
 
     if ( !WebGL.isWebGL2Available() ) {
-    
         const warning = WebGL.getWebGL2ErrorMessage();
         document.getElementById( 'container' ).appendChild( warning );
-    
     }
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -34,20 +36,18 @@ function init() {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.5;
 
-    
     const fov = 70;
     const aspect = window.innerWidth / window.innerHeight;
     const near = 0.1;
     const far = 5000;
     camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-            
-    controls = new OrbitControls( camera, renderer.domElement );
     camera.position.set(-20, 10, 0);
-    //camera.lookAt(new THREE.Vector3(, , ));
-    controls.update();
-    
+
+    const gravity = new RAPIER.Vector3(0.0, -9.81, 0.0);
+    world = new RAPIER.World(gravity);
+
     scene = new THREE.Scene();
-    
+
     lighting();
     scenery();
     renderer.setAnimationLoop(animate());
@@ -90,48 +90,54 @@ function scenery() {
 
     player = new Player({
         scene: scene,
-        scale: PLAYER_MODEL_SCALE
+        scale: PLAYER_MODEL_SCALE,
+        world: world
     });
-
     input = new InputController();
+
+    cameraSystem = new ThirdPersonCamera({
+        camera: camera,
+        target: player,
+        scene: scene
+    });
 
     chunkManager = new ChunkManager({
         scene: scene,
-        player: player
+        player: player,
+        world: world
     });
+
+    const geometry = new THREE.BoxGeometry( 1, 1, 1 );
+    const material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
+    const cube = new THREE.Mesh( geometry, material );
+    scene.add( cube );
+
+    let rigidBodyDesc = RAPIER.RigidBodyDesc.fixed();
+    let cubeBody = world.createRigidBody(rigidBodyDesc);
+    let colliderDesc = RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5);
+    world.createCollider(colliderDesc, cubeBody);
 
 }
 
 
 function animate() {
 
-     /* 
-     sky has position attribute type THREE.Vector3() to constantly move with player (or the attributes on GUI sliders https://threejs.org/examples/?q=shader#webgl_shaders_sky)
-     */
-
     requestAnimationFrame(() => {
-        controls.update();
+        const timeElapsed = clock.getDelta();
+        world.step();
         if (chunkManager) chunkManager.update();
         renderer.render(scene, camera);
-        player.update(input);
-        updateCamera();
+        if (player.mesh) player.update(input);
+        if (cameraSystem) cameraSystem.update(timeElapsed);
         animateSky();
         animate();
-    });
-}
 
-function updateCamera() {
-    const target = player.getPosition();
-    const cameraOffset = new THREE.Vector3(0, 4, -7);
-    const targetPosition = target.clone().add(cameraOffset);
-    camera.position.lerp(targetPosition, 0.1); // speed the camera 'corrects' itself
-    // console.log("PLAYER: ", target, " TARGET: ", targetPosition);
-    camera.lookAt(targetPosition);
+    });
 }
 
 function animateSky() {
     const time = clock.getElapsedTime();
-    const dayLength = 10; // in seconds
+    const dayLength = 1200; // in seconds
 
     const t = (time % dayLength) / dayLength; // in-game 'time' in range [0,1]
 
@@ -144,6 +150,10 @@ function animateSky() {
 
     // move with player to keep world 'infinite'
 }
+
+window.addEventListener('click', () => {
+    renderer.domElement.requestPointerLock();
+});
 
 window.addEventListener('DOMContentLoaded', () => {
     runApp();

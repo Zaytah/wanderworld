@@ -1,16 +1,19 @@
 import * as THREE from 'three';
+import RAPIER from '@dimforge/rapier3d-compat'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-const DEFAULT_SPEED = 0.25;
-const SPRINT_SPEED = 0.4;
+const DEFAULT_SPEED = 3.75; // 0.25;
+const SPRINT_SPEED = 5.25; // 0.4;
+const LATERAL_SPEED = 0.6; // 0.2;
 
 export class Player {
     constructor(params) {
         this.mesh = null;
-        //this.mixer = null; // animations?
         this.velocity = new THREE.Vector3();
         this.direction = new THREE.Vector3();
         this.speed = DEFAULT_SPEED;
+        this.scale = params.scale;
+        this.world = params.world;
 
         this.loadModel(params);
     }
@@ -26,6 +29,7 @@ export class Player {
                 this.mesh.position.set(0, 0, 0);
                 this.position = this.mesh.position;
                 params.scene.add(this.mesh);
+                this.initPhysics();
             },
             (xhr) => {
                 console.log( 'Player: ' + (xhr.loaded / xhr.total * 100) + '% loaded.');
@@ -34,7 +38,7 @@ export class Player {
     }
 
     update(input) {
-        if (!this.mesh) return;
+        if (!this.mesh || !this.playerBody) return;
 
         this.direction.set(0, 0, 0);
 
@@ -43,6 +47,7 @@ export class Player {
         if (input.left) this.direction.x += 1;
         if (input.right) this.direction.x -= 1;
     
+        this.speed = (input.left || input.right || input.backward) ?  LATERAL_SPEED : DEFAULT_SPEED;
         // player can only sprint when moving forward
         this.speed = (input.sprint && input.forward) ? SPRINT_SPEED : DEFAULT_SPEED;
         
@@ -50,11 +55,32 @@ export class Player {
 
         this.direction.normalize();
         this.velocity.copy(this.direction).multiplyScalar(this.speed);
-        this.mesh.position.add(this.velocity);
+        //let target = this.mesh.position.clone().add(this.velocity);
+        //this.mesh.position.lerp(target, 0.2);
+        let currentVelocity = this.playerBody.linvel();
+        this.playerBody.setLinvel({x: this.velocity.x, y: currentVelocity.y, z: this.velocity.z}, true);
+
+        const pos = this.playerBody.translation();
+        const rot = this.playerBody.rotation();
+        this.mesh.position.set(pos.x, pos.y, pos.z);
+        this.mesh.quaternion.set(rot.x, rot.y, rot.z, rot.w);
+    }
+
+    initPhysics() {
+        let rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
+            .setTranslation(0.0, 3.0, 0.0);
+        this.playerBody = this.world.createRigidBody(rigidBodyDesc);
+        this.playerBody.setEnabledRotations(false, false, false);
+        let colliderDesc = RAPIER.ColliderDesc.capsule(this.scale / 2, this.scale / 2);
+        this.world.createCollider(colliderDesc, this.playerBody);
     }
 
     getPosition() {
         return this.mesh ? this.mesh.position : new THREE.Vector3(0, 0, 0);
+    }
+
+    getQuaternion() {
+       return this.mesh ? this.mesh.quaternion : new THREE.Vector3(0, 0, 0);
     }
 }
 
@@ -79,5 +105,6 @@ export class InputController {
             case 'KeyR': this.sprint = state; break;
         }
     }
+
 
 }
