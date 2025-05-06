@@ -1,7 +1,7 @@
+// wanderworld.js
 import * as THREE from 'three';
 import WebGL from 'three/addons/capabilities/WebGL.js';
 import RAPIER from '@dimforge/rapier3d-compat'
-import wasmUrl from '@dimforge/rapier3d/rapier_wasm3d_bg.wasm?url';
 
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 
@@ -45,14 +45,13 @@ async function init() {
     camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
     camera.position.set(-20, 10, 0);
 
-    const gravity = new RAPIER.Vector3(0.0, -9.81, 0.0);
+    const gravity = new RAPIER.Vector3(0.0, -10, 0.0);
     world = new RAPIER.World(gravity);
 
     scene = new THREE.Scene();
 
     lighting();
     scenery();
-    // renderer.setAnimationLoop(animate());
 }
 
 function lighting() {
@@ -109,18 +108,19 @@ function scenery() {
         world: world
     });
 
-    const geometry = new THREE.BoxGeometry( 1, 1, 1 );
-    const material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
-    const cube = new THREE.Mesh( geometry, material );
-    cube.position.set(5, 0, 5);
-    scene.add( cube );
-
-    let rigidBodyDesc = RAPIER.RigidBodyDesc.fixed();
-    let cubeBody = world.createRigidBody(rigidBodyDesc);
-    let colliderDesc = RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5);
-    world.createCollider(colliderDesc, cubeBody);
-
     if (DEBUG) {
+
+        const geometry = new THREE.BoxGeometry( 1, 1, 1 );
+        const material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
+        const cube = new THREE.Mesh( geometry, material );
+        cube.position.set(5, 0, 5);
+        scene.add( cube );
+    
+        let rigidBodyDesc = RAPIER.RigidBodyDesc.fixed();
+        let cubeBody = world.createRigidBody(rigidBodyDesc);
+        let colliderDesc = RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5);
+        world.createCollider(colliderDesc, cubeBody);
+
         debugMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, vertexColors: true });
         debugGeometry = new THREE.BufferGeometry();
         debugMesh = new THREE.LineSegments(debugGeometry, debugMaterial);
@@ -175,14 +175,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
 
-// Update the debug shapes in your animation loop
+// updates physics debug geo/meshes
 function updateDebug() {
-  const { vertices, colors } = world.debugRender(); // Get the vertices and colors for debug shapes
+  const { vertices, colors } = world.debugRender();
 
-  // Update the geometry with the new vertices and colors
   debugGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
   debugGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
 
-  // Set the visibility of the debug mesh based on your needs
-  debugMesh.visible = true;  // You can toggle this based on a debug flag
+  debugMesh.visible = true;
 }

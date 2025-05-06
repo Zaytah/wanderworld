@@ -13,91 +13,79 @@ export class TerrainChunk {
     constructor(params) {
         this.group = params.group;
         this.world = params.world;
-        this.staticBody = params.staticBody; // The single static body for all terrain
-        this.chunkX = params.chunkX;         // Store for reference
-        this.chunkZ = params.chunkZ;         // Store for reference
-        this.chunkSize = params.chunkSize;   // Store for reference
+        this.staticBody = params.staticBody; // single static body for all terrain
+        this.chunkX = params.chunkX;         
+        this.chunkZ = params.chunkZ;         
+        this.chunkSize = params.chunkSize;   
         this._Init(params);
     }
 
     _Init(params) {
         const size = new THREE.Vector3(params.chunkSize, 0, params.chunkSize);
-        // this.scale is defined but not used on the mesh/geometry, be aware if you intended to use it.
 
         let grassTexture = loader.load('./public/assets/Vol_42_1/Vol_42_1_Base_Color.png');
         grassTexture.wrapS = THREE.RepeatWrapping;
         grassTexture.wrapT = THREE.RepeatWrapping;
         grassTexture.repeat.set(5, 5);
 
-        // 1. Create geometry
+        // create geometry
         let planeGeometry = new THREE.PlaneGeometry(size.x, size.z, params.res, params.res);
-        planeGeometry.rotateX(-Math.PI / 2); // Make it horizontal
+        planeGeometry.rotateX(-Math.PI / 2);
 
-        // Get chunk's world offset
+        // chunk's world offset
         const chunkOffsetX = this.chunkX * this.chunkSize;
         const chunkOffsetZ = this.chunkZ * this.chunkSize;
 
-        // 2. Modify vertices for height AND prepare world-space vertices for physics
-        const vertices = planeGeometry.attributes.position; // Reference to geometry's vertex buffer
-        const worldVertices = new Float32Array(vertices.count * 3); // New array for Rapier collider (world space)
+        // physics
+        const vertices = planeGeometry.attributes.position; 
+        const worldVertices = new Float32Array(vertices.count * 3); // for rapier trimesh
 
         for (let i = 0; i < vertices.count; i++) {
-            // Get local vertex position (relative to the chunk's center before height)
+
             const localX = vertices.getX(i);
             const localZ = vertices.getZ(i);
 
-            // Calculate absolute world position for noise sampling
-            const worldX_forNoise = localX + chunkOffsetX;
-            const worldZ_forNoise = localZ + chunkOffsetZ;
+            // world position
+            const wx = localX + chunkOffsetX;
+            const wz = localZ + chunkOffsetZ;
 
-            // Calculate height based on world position
-            const y = fbm(worldX_forNoise, worldZ_forNoise) * 5; // Adjust multiplier as needed
-
-            // Set height in the geometry's local coordinates (visual mesh)
+            const y = fbm(wx, wz) * 5;
             vertices.setY(i, y);
 
-            // Store the final *absolute world* position for the physics collider
-            // We add the chunk offsets here because the Rapier collider is attached
-            // to a single static body assumed to be at the world origin (0,0,0).
-            worldVertices[i * 3 + 0] = localX + chunkOffsetX;
-            worldVertices[i * 3 + 1] = y; // The calculated height
-            worldVertices[i * 3 + 2] = localZ + chunkOffsetZ;
+            // Store the final absolute world position for physics collider
+            worldVertices[i * 3 + 0] = wx;
+            worldVertices[i * 3 + 1] = y;
+            worldVertices[i * 3 + 2] = wz;
         }
 
-        vertices.needsUpdate = true; // IMPORTANT: Tell Three.js the vertex buffer changed
-        planeGeometry.computeVertexNormals(); // Recalculate normals for correct lighting
+        vertices.needsUpdate = true; 
+        planeGeometry.computeVertexNormals();
 
-        // 3. Create the visual mesh using the modified geometry
+        // create visual mesh
         this.plane = new THREE.Mesh(
             planeGeometry,
             new THREE.MeshStandardMaterial({
                 wireframe: false,
                 side: THREE.FrontSide,
                 map: grassTexture,
-                color: new THREE.Color(1.2, 1.5, 1.2) // Multiplies map color (acts as a tint)
+                color: new THREE.Color(1.2, 1.5, 1.2)
             })
         );
 
-        // 4. IMPORTANT: Set the visual mesh's position
-        // Even though the vertices *within* the geometry buffer have height,
-        // the geometry itself is still centered at (0,0,0) locally.
-        // We MUST move the entire mesh object to its correct chunk location.
+        // set the visual meshs position
         this.plane.position.set(chunkOffsetX, 0, chunkOffsetZ);
 
 
-        // ===== 5. Create Physics Collider =====
-        // Ensure geometry has indices (PlaneGeometry creates them)
+        // Physics Collider
         if (!planeGeometry.index) {
             console.error("Cannot create trimesh collider.");
             return;
         }
-        // Rapier expects indices as Uint32Array
-        const indices = new Uint32Array(planeGeometry.index.array);
 
-        // Create the collider description using WORLD-SPACE vertices
+        const indices = new Uint32Array(planeGeometry.index.array);
         const colliderDesc = RAPIER.ColliderDesc.trimesh(worldVertices, indices);
 
-        // Create the collider and attach it to the single static body managed by ChunkManager
+        // create collider and attach to the universal static body 
         this.collider = this.world.createCollider(colliderDesc, this.staticBody.handle);
     }
 
@@ -155,10 +143,10 @@ export class ChunkManager {
                 chunkX: cx,
                 chunkZ: cz,
                 res: this.resolution,
-                group: this.group,         // Pass the THREE group
-                world: this.world,         // Pass the RAPIER world
-                staticBody: this.staticBody, // Pass the handle to the static body
-                player: this.player        // Pass player if needed by chunk logic (currently not)
+                group: this.group,         
+                world: this.world,         
+                staticBody: this.staticBody, 
+                player: this.player
             });
 
             this.chunks.set(key, chunk);
