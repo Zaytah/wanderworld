@@ -248,14 +248,9 @@ export class Player {
     }
 
     // Return position of the physics body (capsule center)
-    getPosition() {
-        return this.playerBody ? this.playerBody.translation() : new THREE.Vector3(5, 15, 5); // Estimate if not ready
-    }
-
+    getPosition() { return this.playerBody ? this.playerBody.translation() : new THREE.Vector3(5, 15, 5); }
     // Return the visual mesh's quaternion
-    getQuaternion() {
-       return this.mesh ? this.mesh.quaternion : new THREE.Quaternion();
-    }
+    getQuaternion() { return this.mesh ? this.mesh.quaternion : new THREE.Quaternion(); }
 }
 
 export class InputController {
