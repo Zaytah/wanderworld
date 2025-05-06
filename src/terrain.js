@@ -146,12 +146,9 @@ export class ChunkManager {
             };
             console.log("ChunkManager: Terrain worker initialized.");
 
-            // 3. Set isInitialized flag - Worker is ready to receive requests
+            // worker is ready to receive requests
             this.isInitialized = true;
-            console.log("ChunkManager: Core systems initialized. Performing initial chunk check...");
-
-            // 4. Perform Initial Chunk Check (requests generation, doesn't create yet)
-            this.checkForNeededChunks(true); // Force initial check
+            this.checkForNeededChunks(true);
 
             console.log("ChunkManager: Initialization complete.");
 

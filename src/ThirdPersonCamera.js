@@ -44,4 +44,10 @@ export class ThirdPersonCamera {
         this.camera.lookAt(this.pivot.position);
     }
 
+    getCameraDirection() {
+        let vec = new THREE.Vector3();
+        this.camera.getWorldDirection(vec);
+        return vec;
+    }
+
 }

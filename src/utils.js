@@ -23,7 +23,7 @@ export class Player {
         this.world = params.world;
         this.playerBody = null;
         this.position = new THREE.Vector3(5, 0, 5);
-        this.gameCamera = null;
+        this.camSystem = null;
 
         // Animation
         this.mixer = null;              // THREE.AnimationMixer
@@ -49,7 +49,7 @@ export class Player {
         loader.load(
             'public/models/bananacat/scene.gltf',
             (gltf) => {
-                console.log("GLTF Loaded:", gltf);
+                // console.log("GLTF Loaded:", gltf);
                 this.mesh = gltf.scene;
 
                 // Visual Setup
@@ -97,7 +97,7 @@ export class Player {
 
     initPhysics() {
         if (!this.mesh) return;
-        console.log('Initializing player physics...');
+        console.log('Initializing player physics.');
 
         this.capsuleInfo.halfHeight = this.capsuleInfo.height / 2;
         this.capsuleInfo.offsetY = -this.capsuleInfo.halfHeight - this.capsuleInfo.radius + MODEL_OFFSET_Y;
@@ -143,7 +143,8 @@ export class Player {
             let direction = new THREE.Vector3();
 
             let forward = new THREE.Vector3();
-            this.mesh.getWorldDirection(forward);
+            
+            if (this.camSystem) forward.copy(this.camSystem.getCameraDirection());
             forward.y = 0;
             forward.normalize();
 
@@ -152,13 +153,13 @@ export class Player {
 
             if (input.forward)  { this.direction.z += 1; direction.add(forward); }
             if (input.backward) { this.direction.z -= 1; direction.sub(forward); }
-            if (input.left) { this.direction.x += 1; direction.sub(right); }
-            if (input.right) { this.direction.x -= 1; direction.add(right); }
+            if (input.left) { this.direction.x += 1; direction.add(right); }
+            if (input.right) { this.direction.x -= 1; direction.sub(right); }
 
             const isMoving = this.direction.lengthSq() > 0.01;
             if (isMoving) {
-                this.direction.normalize();
-                direction.normalize();
+                // this.direction.normalize();
+                this.direction.copy(direction).normalize();
                  
                 if (nextState === 'Run') {
                     targetSpeed = SPRINT_SPEED;
@@ -168,7 +169,6 @@ export class Player {
             }
 
             this.velocity.copy(this.direction).multiplyScalar(targetSpeed);
-            //this.velocity.copy(direction).multiplyScalar(targetSpeed);
             let currentVelocity = this.playerBody.linvel();
             // apply velocity only if not jumping
             if (nextState !== 'Jump') {
@@ -384,7 +384,7 @@ export class Player {
     // Getters/Setters
     getPosition() { return this.playerBody ? this.playerBody.translation() : new THREE.Vector3(5, 10, 5); }
     getQuaternion() { return this.mesh ? this.mesh.quaternion : new THREE.Quaternion(); }
-    setCamera(camera) { this.gameCamera = camera; }
+    setCamera(camera) { this.camSystem = camera; }
 }
 
 export class InputController {

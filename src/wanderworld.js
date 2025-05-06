@@ -102,7 +102,6 @@ async function scenery() {
         target: player,
         scene: scene
     });
-
     player.setCamera(cameraSystem);
 
     chunkManager = new ChunkManager({
@@ -113,13 +112,10 @@ async function scenery() {
     });
 
     try {
-        await chunkManager.initialize(); // <<-- IMPORTANT: Await this new method
-        console.log("ChunkManager is ready and initial terrain generated.");
-        // Now it's safe to start the game loop that calls chunkManager.update()
-        //animate();
+        await chunkManager.initialize();
+        console.log("Initial terrain generated.");
     } catch (error) {
-        console.error("Failed to initialize ChunkManager. Game cannot start.", error);
-        // Display an error to the user, prevent game from starting
+        console.error("Failed to initialize ChunkManager. World cannot start.", error);
     }
 
     if (DEBUG) {
