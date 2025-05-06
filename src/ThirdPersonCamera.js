@@ -37,12 +37,11 @@ export class ThirdPersonCamera {
         });
     }
 
-    update(timeElapsed) {
+    update(dt) {
         const targetPos = this.target.getPosition();
         this.pivot.position.lerp(new THREE.Vector3(targetPos.x - 0.05, targetPos.y, targetPos.z + 1), 0.25);
         this.pivot.rotation.set(this.rotation.x, this.rotation.y, 0);
         this.camera.lookAt(this.pivot.position);
     }
-
 
 }

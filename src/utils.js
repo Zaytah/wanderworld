@@ -4,7 +4,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const DEFAULT_SPEED = 3.75;
-const SPRINT_SPEED = 5.25;
+const SPRINT_SPEED = 95.25;
 const LATERAL_SPEED = 3.0;
 const JUMP_FORCE = 2.5; 
 
@@ -23,6 +23,7 @@ export class Player {
         this.world = params.world;
         this.playerBody = null;
         this.position = new THREE.Vector3(5, 0, 5);
+        this.gameCamera = null;
 
         // Animation
         this.mixer = null;              // THREE.AnimationMixer
@@ -102,7 +103,7 @@ export class Player {
         this.capsuleInfo.offsetY = -this.capsuleInfo.halfHeight - this.capsuleInfo.radius + MODEL_OFFSET_Y;
 
         let rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-            .setTranslation(5.0, 10.0, 5.0)
+            .setTranslation(5.0, 15.0, 5.0)
             .setLinearDamping(0.1)
             .setAngularDamping(1.0);
 
@@ -139,14 +140,25 @@ export class Player {
         let targetSpeed = 0;
             // Calculate movement direction and speed based on input
             this.direction.set(0, 0, 0);
-            if (input.forward) this.direction.z += 1;
-            if (input.backward) this.direction.z -= 1;
-            if (input.left) this.direction.x += 1;
-            if (input.right) this.direction.x -= 1;
+            let direction = new THREE.Vector3();
+
+            let forward = new THREE.Vector3();
+            this.mesh.getWorldDirection(forward);
+            forward.y = 0;
+            forward.normalize();
+
+            let right = new THREE.Vector3();
+            right.crossVectors(new THREE.Vector3(0, 1, 0), forward).normalize();
+
+            if (input.forward)  { this.direction.z += 1; direction.add(forward); }
+            if (input.backward) { this.direction.z -= 1; direction.sub(forward); }
+            if (input.left) { this.direction.x += 1; direction.sub(right); }
+            if (input.right) { this.direction.x -= 1; direction.add(right); }
 
             const isMoving = this.direction.lengthSq() > 0.01;
             if (isMoving) {
                 this.direction.normalize();
+                direction.normalize();
                  
                 if (nextState === 'Run') {
                     targetSpeed = SPRINT_SPEED;
@@ -156,6 +168,7 @@ export class Player {
             }
 
             this.velocity.copy(this.direction).multiplyScalar(targetSpeed);
+            //this.velocity.copy(direction).multiplyScalar(targetSpeed);
             let currentVelocity = this.playerBody.linvel();
             // apply velocity only if not jumping
             if (nextState !== 'Jump') {
@@ -368,10 +381,10 @@ export class Player {
         return { name, timeScale };
     }
 
-
-    // Getters
+    // Getters/Setters
     getPosition() { return this.playerBody ? this.playerBody.translation() : new THREE.Vector3(5, 10, 5); }
     getQuaternion() { return this.mesh ? this.mesh.quaternion : new THREE.Quaternion(); }
+    setCamera(camera) { this.gameCamera = camera; }
 }
 
 export class InputController {

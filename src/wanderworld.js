@@ -14,6 +14,7 @@ const DEBUG = false;
 let scene, camera, renderer, world;
 let sky, sun, elevation, azimuth;
 let player, chunkManager, cameraSystem, input;
+let textures;
 let debugMaterial, debugGeometry, debugMesh;
 
 const clock = new THREE.Clock();
@@ -87,7 +88,7 @@ function lighting() {
 
 }
 
-function scenery() {
+async function scenery() {
 
     player = new Player({
         scene: scene,
@@ -102,11 +103,24 @@ function scenery() {
         scene: scene
     });
 
+    player.setCamera(cameraSystem);
+
     chunkManager = new ChunkManager({
         scene: scene,
         player: player,
-        world: world
+        world: world,
+        textures: textures
     });
+
+    try {
+        await chunkManager.initialize(); // <<-- IMPORTANT: Await this new method
+        console.log("ChunkManager is ready and initial terrain generated.");
+        // Now it's safe to start the game loop that calls chunkManager.update()
+        //animate();
+    } catch (error) {
+        console.error("Failed to initialize ChunkManager. Game cannot start.", error);
+        // Display an error to the user, prevent game from starting
+    }
 
     if (DEBUG) {
 
@@ -138,8 +152,8 @@ function animate() {
         const dt = clock.getDelta();
         world.step();
         if (chunkManager) chunkManager.update();
-        if (player && player.mesh && player.playerBody) player.update(input, dt);
         if (cameraSystem) cameraSystem.update(dt);
+        if (player && player.mesh && player.playerBody) player.update(input, dt);
         animateSky();
         renderer.render(scene, camera);
 
@@ -172,7 +186,6 @@ window.addEventListener('click', () => {
 window.addEventListener('DOMContentLoaded', () => {
     runApp();
 });
-
 
 
 // updates physics debug geo/meshes
