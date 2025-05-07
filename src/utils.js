@@ -103,7 +103,7 @@ export class Player {
         this.capsuleInfo.offsetY = -this.capsuleInfo.halfHeight - this.capsuleInfo.radius + MODEL_OFFSET_Y;
 
         let rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-            .setTranslation(5.0, 25.0, 5.0)
+            .setTranslation(64.0, 40.0, 64.0)
             .setLinearDamping(0.1)
             .setAngularDamping(1.0);
 

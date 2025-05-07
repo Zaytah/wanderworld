@@ -2,6 +2,10 @@
 
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
+import { Water } from 'three/examples/jsm/objects/Water.js';
+import terrainVertexShader from './shaders/terrainVertexShader.glsl';
+import terrainFragShader from './shaders/terrainFragShader.glsl';
+import { BIOME_ID } from './noise.js';
 
 const RESOLUTION = 64;
 const CHUNK_SIZE = 128; // better performance to increase this than render distance
@@ -9,6 +13,10 @@ const MAX_CHUNKS_PER_FRAME = 1;
 
 const loader = new THREE.TextureLoader();
 let grassTexture = null;
+let rockTexture = null;
+let snowTexture = null;
+let sandTexture = null;
+let waterNormalsMap = null;
 
 export class TerrainChunk {
     constructor(params, chunkData) {
@@ -20,17 +28,21 @@ export class TerrainChunk {
         this.chunkSize = params.chunkSize;
         this.plane = null;
         this.collider = null;
+        this.water = null;
+        this.sunDirection = null;
+        this.lights = params.lights;
 
         this._Init(params, chunkData);
     }
 
     _Init(params, chunkData) {
-        const { positions, indices, worldVertices, uvs, normals } = chunkData;
+        const { positions, indices, worldVertices, uvs, normals, biomes } = chunkData;
 
         const planeGeometry = new THREE.BufferGeometry();
         planeGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         planeGeometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
         planeGeometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+        planeGeometry.setAttribute('biome', new THREE.BufferAttribute(biomes, 1));
         planeGeometry.setIndex(new THREE.BufferAttribute(indices, 1));
 
         if (!grassTexture) {
@@ -41,7 +53,29 @@ export class TerrainChunk {
         const material = new THREE.MeshStandardMaterial({
             side: THREE.FrontSide,
             map: grassTexture,
-            color: new THREE.Color(1.2, 1.5, 1.2)
+            color: new THREE.Color(1.2, 1.2, 1.2)
+        });
+
+        const ambientColor = this.lights.hemisphere ? this.lights.hemisphere.color.clone() : new THREE.Color(0x404040);
+        const dirLightColor = this.lights.directional ? this.lights.directional.color.clone() : new THREE.Color(0xffffff);
+        // Calculate direction TO the light source (assuming light position points FROM origin)
+        const dirLightDir = this.lights.directional ? this.lights.directional.position.clone().normalize() : new THREE.Vector3(0, 1, 0);
+
+        const shaderMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                grassTexture: { value: grassTexture },
+                    rockTexture: { value: rockTexture },
+                    snowTexture: { value: snowTexture },
+                    sandTexture: { value: sandTexture },
+
+                    ambientLightColor: { value: ambientColor },
+                    directionalLightDirection: { value: dirLightDir },
+                    directionalLightColor: { value: dirLightColor }
+            },
+            vertexShader: terrainVertexShader,
+            fragmentShader: terrainFragShader,
+            side: THREE.FrontSide
+
         });
 
         this.plane = new THREE.Mesh(planeGeometry, material);
@@ -52,6 +86,40 @@ export class TerrainChunk {
         const chunkOffsetZ = this.chunkZ * this.chunkSize;
         this.plane.position.set(chunkOffsetX, 0, chunkOffsetZ);
 
+        // Water
+        let hasWater = false;
+        const WATER_LEVEL = 0.5;
+        let minHeightInChunk = Infinity;
+        for (let i = 1; i < positions.length; i+=3) {
+            minHeightInChunk = Math.min(minHeightInChunk, positions[i]);
+        }
+        if (minHeightInChunk < WATER_LEVEL) {
+            hasWater = true;
+            let waterGeometry = new THREE.PlaneGeometry(this.chunkSize, this.chunkSize);
+
+            if (!waterNormalsMap) console.error("Water normals texture not loaded.");
+
+            this.water = new Water(
+                waterGeometry,
+                {
+                    textureWidth: 128,
+                    textureHeight: 128,
+                    waterNormals: waterNormalsMap,
+                    sunDirection: this.sunDirection ? this.sunDirection.clone() : new THREE.Vector3(0,1,0),
+                    sunColor: 0xffffff,
+                    waterColor: 0x001e0f,
+                    distortionScale: 3.7,
+                    //fog: this.scene.fog !== undefined // Use scene fog if available
+                }
+            );
+
+            this.water.rotation.x = - Math.PI / 2;
+            this.water.position.set(chunkOffsetX, WATER_LEVEL - 0.05, chunkOffsetZ);
+
+            this.water.receiveShadow = true;
+            this.water.castShadow = false;
+        }
+
         // Physics
         const colliderDesc = RAPIER.ColliderDesc.trimesh(worldVertices, indices);
         this.collider = this.world.createCollider(colliderDesc, this.staticBody.handle);
@@ -59,9 +127,11 @@ export class TerrainChunk {
 
     addChunk() {
         if (this.plane) this.group.add(this.plane);
+        // if (this.water) this.group.add(this.water);
     }
 
-    destroy() {
+    // weird behavior without this sometimes
+    free() {
         if (this.collider) {
             this.world.removeCollider(this.collider, false);
             this.collider = null;
@@ -73,6 +143,14 @@ export class TerrainChunk {
                 this.plane.material.dispose();
             }
             this.plane = null;
+        }
+        if (this.water) {
+            this.group.remove(this.water);
+            this.water.geometry.dispose();
+            if (this.water.material && typeof this.water.material.dispose === 'function') {
+                this.water.material.dispose();
+            }
+            this.water = null;
         }
     }
 }
@@ -95,6 +173,7 @@ export class ChunkManager {
         this.isInitialized = false;
         this.lastPlayerChunkX = null;
         this.lastPlayerChunkZ = null;
+        this.lights = params.lights;
 
         // queues for staggering (optimization)
         this.creationQueue = []; // holds chunkData received from worker
@@ -110,14 +189,39 @@ export class ChunkManager {
         console.log("ChunkManager: Initializing.");
 
         try {
-            grassTexture = await loader.loadAsync('./public/assets/Vol_42_1/Vol_42_1_Base_Color.png');
-            grassTexture.wrapS = THREE.RepeatWrapping;
-            grassTexture.wrapT = THREE.RepeatWrapping;
-            grassTexture.repeat.set(5, 5);
-            grassTexture.colorSpace = THREE.SRGBColorSpace;
-            grassTexture.anisotropy = 4;
-            grassTexture.needsUpdate = true;
-            console.log("ChunkManager: Grass texture loaded successfully.");
+            const texturePaths = [
+                './public/assets/grass_with_rocks_01_1k/grass_with_rocks_01_color_1k.png', // grass
+                './public/assets/ground_with_rocks_03_1k/ground_with_rocks_03_color_1k.png', // rock
+                './public/assets/sand_04_1k/sand_04_color_1k.png', // sand
+                './public/assets/snow_01_1k/snow_01_color_1k.png', // snow
+                './public/assets/simple-ocean-normal-map.jpeg' // water
+            ]
+
+            const texturePromises = texturePaths.map(path => {
+                console.log(`Attempting to load: ${path}`);
+                return loader.loadAsync(path).catch(err => {
+                    console.error(`Failed to load texture: ${path}`, err);
+                    return null;
+                });
+            });
+
+            const loadedTextures = await Promise.all(texturePromises);
+            
+            loadedTextures.forEach((tex, index) => {
+                if(tex) {
+                    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                    tex.repeat.set(16, 16);
+                    tex.colorSpace = THREE.SRGBColorSpace;
+                    tex.anisotropy = 4;
+                    tex.needsUpdate = true;
+                 }
+            });
+            
+           grassTexture = loadedTextures[0];
+           rockTexture = loadedTextures[1];
+           snowTexture = loadedTextures[2];
+           sandTexture = loadedTextures[3];
+           waterNormalsMap = loadedTextures[4];
 
             // Web Worker
             console.log("ChunkManager: Initializing terrain worker.");
@@ -128,11 +232,9 @@ export class ChunkManager {
                 const chunkData = event.data;
                 const key = this.getChunkKey(chunkData.chunkX, chunkData.chunkZ);
 
-                // Add received data to creation queue instead of creating immediately
+                // Add received data to creation queue 
                 if (this.pendingChunks.has(key)) {
                     this.creationQueue.push(chunkData);
-                } else {
-                     // console.log(`Worker finished chunk ${key}, but it's no longer needed.`);
                 }
             };
 
@@ -168,7 +270,6 @@ export class ChunkManager {
         if (!this.worker || !this.isInitialized) return;
 
         const key = this.getChunkKey(cx, cz);
-        // Request only if not loaded and not already pending OR queued for creation
         const isInCreationQueue = this.creationQueue.some(data => data.chunkX === cx && data.chunkZ === cz);
         if (!this.chunks.has(key) && !this.pendingChunks.has(key) && !isInCreationQueue) {
             this.pendingChunks.add(key);
@@ -181,7 +282,7 @@ export class ChunkManager {
         }
     }
 
-    // Checks which chunks are needed/unneeded and queues requests/destruction
+    // checks which chunks are needed/unneeded
     checkForNeededChunks(forceImmediate = false) {
          if (!this.isInitialized) return;
 
@@ -191,7 +292,6 @@ export class ChunkManager {
          const currentChunkX = Math.floor(playerPos.x / this.chunkSize);
          const currentChunkZ = Math.floor(playerPos.z / this.chunkSize);
 
-         // Throttle update check
          if (!forceImmediate && this.lastPlayerChunkX === currentChunkX && this.lastPlayerChunkZ === currentChunkZ) {
              return;
          }
@@ -205,7 +305,7 @@ export class ChunkManager {
              }
          }
 
-         // Request missing chunks
+         // request missing chunks
          for (const key of neededChunks) {
              if (!this.chunks.has(key)) {
                   const [cxStr, czStr] = key.split(',');
@@ -213,7 +313,7 @@ export class ChunkManager {
              }
          }
 
-         // Queue unnecessary chunks for destruction
+         // queue unnecessary chunks for destruction
          for (let key of this.chunks.keys()) {
              if (!neededChunks.has(key)) {
                  if (!this.destructionQueue.includes(key)) {
@@ -222,7 +322,7 @@ export class ChunkManager {
              }
          }
 
-         // Cancel pending generation for chunks that are no longer needed
+         // cancel pending generation for chunks that are no longer needed
          const pendingToRemove = [];
          for (let key of this.pendingChunks) {
               if (!neededChunks.has(key)) {
@@ -238,70 +338,69 @@ export class ChunkManager {
           }
     }
 
-    // Processes the queues each frame
     processQueues() {
         if (!this.isInitialized) return;
 
-        // Process Creation Queue
+        // process creation queue
         let createdCount = 0;
         while (this.creationQueue.length > 0 && createdCount < MAX_CHUNKS_PER_FRAME) {
             const chunkData = this.creationQueue.shift();
             const key = this.getChunkKey(chunkData.chunkX, chunkData.chunkZ);
 
-            // Double-check if still needed and not already created/destroyed
             if (this.pendingChunks.has(key) && !this.chunks.has(key) && !this.destructionQueue.includes(key)) {
                 const chunk = new TerrainChunk({
                     group: this.group,
                     world: this.world,
                     staticBody: this.staticBody,
                     chunkSize: this.chunkSize,
+                    lights: this.lights
                 }, chunkData);
 
                 this.chunks.set(key, chunk);
                 chunk.addChunk();
-                this.pendingChunks.delete(key); // Remove from pending now it's created
+                this.pendingChunks.delete(key);
                 createdCount++;
             } else {
                  if (this.pendingChunks.has(key)) {
-                     this.pendingChunks.delete(key); // Ensure removed from pending if skipped
+                     this.pendingChunks.delete(key);
                  }
             }
         }
 
-        // Process Destruction Queue
+        // process destruction queue
         let destroyedCount = 0;
         while (this.destructionQueue.length > 0 && destroyedCount < MAX_CHUNKS_PER_FRAME) {
             const key = this.destructionQueue.shift();
             const chunk = this.chunks.get(key);
             if (chunk) {
-                chunk.destroy();
+                chunk.free();
                 this.chunks.delete(key);
                 destroyedCount++;
             }
         }
     }
 
-
-    // Main update loop calls this
     update() {
         if (this.isInitialized) {
-            this.checkForNeededChunks(); // Check if player moved, queue requests/destructions
-            this.processQueues();       // Process a limited number of creations/destructions
+            this.checkForNeededChunks();
+            this.processQueues();
         }
     }
 
-    // ... (getChunkKey, setTexture, dispose methods remain the same) ...
     setTexture(textureName, texture) {
         this.textures[textureName] = texture;
     }
+
+
     getChunkKey(x, z) {
         return `${x},${z}`;
     }
-    dispose() {
+
+    // weird behavior without this sometimes
+    free() {
         if (this.worker) {
             this.worker.terminate();
             this.worker = null;
-            console.log("Terrain worker terminated.");
         }
         for (let chunk of this.chunks.values()) {
              chunk.destroy();

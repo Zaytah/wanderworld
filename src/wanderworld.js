@@ -12,7 +12,7 @@ import { ThirdPersonCamera } from './ThirdPersonCamera.js';
 const DEBUG = false;
 
 let scene, camera, renderer, world;
-let sky, sun, elevation, azimuth, directionalLight;
+let sky, sun, elevation, azimuth, hemisphereLight, directionalLight;
 let player, chunkManager, cameraSystem, input;
 let textures;
 let debugMaterial, debugGeometry, debugMesh;
@@ -59,7 +59,7 @@ async function init() {
 }
 
 function lighting() {
-    const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 1.4);
+    hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 1.4);
     scene.add(hemisphereLight);
     scene.add(new THREE.AmbientLight(0xffffbb, 0.6));
     
@@ -124,7 +124,8 @@ async function scenery() {
         scene: scene,
         player: player,
         world: world,
-        textures: textures
+        textures: textures,
+        lights: {directional: directionalLight, hemisphere: hemisphereLight}
     });
 
     try {
