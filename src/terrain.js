@@ -78,7 +78,7 @@ export class TerrainChunk {
 
         });
 
-        this.plane = new THREE.Mesh(planeGeometry, material);
+        this.plane = new THREE.Mesh(planeGeometry, shaderMaterial);
         this.plane.receiveShadow = true;
         this.plane.castShadow = false;
 
@@ -102,8 +102,8 @@ export class TerrainChunk {
             this.water = new Water(
                 waterGeometry,
                 {
-                    textureWidth: 128,
-                    textureHeight: 128,
+                    textureWidth: 256,
+                    textureHeight: 256,
                     waterNormals: waterNormalsMap,
                     sunDirection: this.sunDirection ? this.sunDirection.clone() : new THREE.Vector3(0,1,0),
                     sunColor: 0xffffff,
@@ -127,7 +127,7 @@ export class TerrainChunk {
 
     addChunk() {
         if (this.plane) this.group.add(this.plane);
-        // if (this.water) this.group.add(this.water);
+        if (this.water) this.group.add(this.water);
     }
 
     // weird behavior without this sometimes
@@ -219,8 +219,8 @@ export class ChunkManager {
             
            grassTexture = loadedTextures[0];
            rockTexture = loadedTextures[1];
-           snowTexture = loadedTextures[2];
-           sandTexture = loadedTextures[3];
+           sandTexture = loadedTextures[2];
+           snowTexture = loadedTextures[3];
            waterNormalsMap = loadedTextures[4];
 
             // Web Worker

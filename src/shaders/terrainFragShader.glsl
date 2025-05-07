@@ -27,6 +27,11 @@ const float BIOME_FOREST = 3.0;
 const float BIOME_ROCKY = 4.0;
 const float BIOME_SNOW = 5.0;
 
+const vec2 grassRepeat = vec2(16.0, 16.0);
+const vec2 rockRepeat = vec2(8.0, 8.0);
+const vec2 snowRepeat = vec2(12.0, 12.0);
+const vec2 sandRepeat = vec2(8.0, 8.0);
+
 void main() {
     vec4 texColor = vec4(0.8, 0.8, 0.8, 1.0); // Default grey
 
@@ -34,15 +39,15 @@ void main() {
    float biomeId = floor(vBiome + 0.5); // Use floor to handle potential interpolation
 
     if (biomeId == BIOME_BEACH) {
-        texColor = texture2D(sandTexture, vUv);
+        texColor = texture2D(sandTexture, vUv * sandRepeat);
     } else if (biomeId == BIOME_ROCKY) {
-        texColor = texture2D(rockTexture, vUv);
+        texColor = texture2D(rockTexture, vUv * rockRepeat);
     } else if (biomeId == BIOME_SNOW) {
-        texColor = texture2D(snowTexture, vUv);
+        texColor = texture2D(snowTexture, vUv * snowRepeat);
     } else if (biomeId == BIOME_FOREST) {
-        texColor = texture2D(grassTexture, vUv) * vec4(0.7, 0.9, 0.7, 1.0); // Forest tint
+        texColor = texture2D(grassTexture, vUv * grassRepeat) * vec4(0.7, 0.9, 0.7, 1.0); // Forest tint
     } else if (biomeId == BIOME_GRASSLAND) {
-        texColor = texture2D(grassTexture, vUv);
+        texColor = texture2D(grassTexture, vUv * grassRepeat);
     }
     // Ignore OCEAN for terrain texture
 

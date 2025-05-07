@@ -1,14 +1,5 @@
 // Attributes from BufferGeometry
 attribute float biome;
-attribute vec3 position;
-attribute vec2 uv;
-attribute vec3 normal;
-
-// Uniforms from THREE.js / JavaScript
-uniform mat4 modelViewMatrix;
-uniform mat4 projectionMatrix;
-uniform mat3 normalMatrix;
-uniform mat4 modelMatrix; // Pass modelMatrix for world space calculations
 
 // Varyings sent to Fragment Shader
 varying vec2 vUv;
