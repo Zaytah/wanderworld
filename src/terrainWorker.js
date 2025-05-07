@@ -2,7 +2,7 @@
 
 // pretty much copied logic from three.js source code for calculations (vectors, normals, etc.) :p
 
-import { fbm } from './noise.js';
+import { genTerrainHeight } from './noise.js';
 
 const Vec3 = {
     create: (x = 0, y = 0, z = 0) => ({ x, y, z }),
@@ -71,7 +71,7 @@ function generateChunkData(params) {
             const localX = ix * segmentSizeX - halfSizeX;
             const wx = localX + chunkOffsetX;
             const wz = localZ + chunkOffsetZ;
-            const y = fbm(wx, wz) * 5;
+            const y = genTerrainHeight(wx, wz);
 
             positions[vertIndex + 0] = localX;
             positions[vertIndex + 1] = y;

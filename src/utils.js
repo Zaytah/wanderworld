@@ -56,7 +56,7 @@ export class Player {
                 this.mesh.scale.set(1, 1, 1);
                 this.mesh.traverse((child) => {
                     if (child.isMesh) {
-                        // child.material.color = new THREE.Color(1.5, 1.5, 1.5);
+                        child.material.color = new THREE.Color(1.5, 1.5, 1.5);
                         child.castShadow = true;
                         child.receiveShadow = true;
                     }
@@ -103,7 +103,7 @@ export class Player {
         this.capsuleInfo.offsetY = -this.capsuleInfo.halfHeight - this.capsuleInfo.radius + MODEL_OFFSET_Y;
 
         let rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-            .setTranslation(5.0, 15.0, 5.0)
+            .setTranslation(5.0, 25.0, 5.0)
             .setLinearDamping(0.1)
             .setAngularDamping(1.0);
 

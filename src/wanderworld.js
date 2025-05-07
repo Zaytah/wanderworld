@@ -12,7 +12,7 @@ import { ThirdPersonCamera } from './ThirdPersonCamera.js';
 const DEBUG = false;
 
 let scene, camera, renderer, world;
-let sky, sun, elevation, azimuth;
+let sky, sun, elevation, azimuth, directionalLight;
 let player, chunkManager, cameraSystem, input;
 let textures;
 let debugMaterial, debugGeometry, debugMesh;
@@ -38,6 +38,8 @@ async function init() {
     document.body.appendChild( renderer.domElement );
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.5;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     const fov = 70;
     const aspect = window.innerWidth / window.innerHeight;
@@ -51,37 +53,51 @@ async function init() {
 
     scene = new THREE.Scene();
 
+
     lighting();
     scenery();
 }
 
 function lighting() {
-    /*
-        Should adjust lighting with sun/sky animation to be more accurate
-    */
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(5, 10, 5);
-    scene.add(light);
-    scene.add(new THREE.AmbientLight(0xffffff, 1));
+    const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 1.4);
+    scene.add(hemisphereLight);
+    scene.add(new THREE.AmbientLight(0xffffbb, 0.6));
+    
+    directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    console.log(directionalLight);
+    directionalLight.position.set(100, 500, 100);
+    directionalLight.castShadow = true;
+    // shadow box
+    directionalLight.shadow.camera.left = -100;
+    directionalLight.shadow.camera.right = 100;
+    directionalLight.shadow.camera.top = 100;
+    directionalLight.shadow.camera.bottom = -100;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 500;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    scene.add(directionalLight);
+
+    scene.fog = new THREE.Fog( 0x99DDFF, 5000, 10000 );
 
     sky = new Sky();
     sky.scale.setScalar( 450000 );
     scene.add( sky );
 
     // sky material uniform values
-    sky.material.uniforms.mieCoefficient.value = 0.0005;
-    sky.material.uniforms.mieDirectionalG.value = 0.99;
-    sky.material.uniforms.turbidity.value = 2;
-    sky.material.uniforms.rayleigh.value = 1;
+    sky.material.uniforms.mieCoefficient.value = 0.005;
+    sky.material.uniforms.mieDirectionalG.value = 0.85;
+    sky.material.uniforms.turbidity.value = 5;
+    sky.material.uniforms.rayleigh.value = 2;
     
     sun = new THREE.Vector3();
-    elevation = 2;
+    elevation = 4;
     azimuth = 180; // angle to 'rotate' sun on same level of elevation
     const phi = THREE.MathUtils.degToRad( 90 - elevation );
     const theta = THREE.MathUtils.degToRad( azimuth );
     sun.setFromSphericalCoords( 1, phi, theta );
-    sky.material.uniforms[ 'sunPosition' ].value.copy( sun ); // sky.material.uniforms.sunPosition.value.copy(sun);
-    camera.lookAt(sun);
+    sky.material.uniforms[ 'sunPosition' ].value.copy( sun );
+    
     
     console.log(sky);
     console.log(sky.material.uniforms);
@@ -161,7 +177,7 @@ function animate() {
 
 function animateSky() {
     const time = clock.getElapsedTime();
-    const dayLength = 1200; // in seconds
+    const dayLength = 9; // in seconds
 
     const t = (time % dayLength) / dayLength; // in-game 'time' in range [0,1]
 
@@ -171,6 +187,22 @@ function animateSky() {
     const theta = THREE.MathUtils.degToRad( azimuth );
     sun.setFromSphericalCoords(1, phi, theta);
     sky.material.uniforms['sunPosition'].value.copy(sun);
+
+    // move directionalLight with sun
+    const MIN_ELEVATION = -10.0;
+    const MAX_ELEVATION = 25.0;
+    const MIN_INTENSITY = 0.75;
+    const MAX_INTENSITY = 5.2;
+    
+    let normalizedElevation = (elevation - MIN_ELEVATION) / (MAX_ELEVATION - MIN_ELEVATION);
+    normalizedElevation = Math.max(0, Math.min(1, normalizedElevation));
+    let intensity = MIN_INTENSITY + normalizedElevation * (MAX_INTENSITY - MIN_INTENSITY);
+    intensity = Math.max(0.1, intensity);
+    
+    if (directionalLight) {
+        directionalLight.intensity = intensity;
+        directionalLight.position.copy(sun).multiplyScalar(100);
+    }
 
     // move with player to keep world 'infinite'
 }
