@@ -60,7 +60,7 @@ async function init() {
 }
 
 function lighting() {
-    hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 1.4);
+    hemisphereLight = new THREE.HemisphereLight(0xFFF5CF, 0x111177, 1.5);
     scene.add(hemisphereLight);
     scene.add(new THREE.AmbientLight(0xffffbb, 0.6));
     
@@ -77,6 +77,7 @@ function lighting() {
     directionalLight.shadow.camera.far = 500;
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.radius = 10;
     scene.add(directionalLight);
 
     scene.fog = new THREE.Fog( 0x99DDFF, 5000, 10000 );
@@ -161,6 +162,7 @@ function postprocessing() {
     composer = new EffectComposer(renderer);
     let renderPass = new RenderPass(scene, camera);
     composer.addPass(renderPass);
+    //console.log(composer);
 
     let width = window.innerWidth;
     let height = window.innerHeight;
