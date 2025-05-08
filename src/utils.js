@@ -49,10 +49,9 @@ export class Player {
         loader.load(
             'public/models/bananacat/scene.gltf',
             (gltf) => {
-                // console.log("GLTF Loaded:", gltf);
                 this.mesh = gltf.scene;
 
-                // Visual Setup
+                // Visual
                 this.mesh.scale.set(1, 1, 1);
                 this.mesh.traverse((child) => {
                     if (child.isMesh) {
@@ -85,7 +84,7 @@ export class Player {
                 // console.log('Player model added to scene.');
                 this.initPhysics(); // Initialize physics AFTER model is loaded
 
-                // Apply visual scale factor
+                // visual scale factor
                 if (this.mesh && this.scale) {
                     this.mesh.scale.set(this.scale, this.scale, this.scale);
                 }
@@ -103,7 +102,7 @@ export class Player {
         this.capsuleInfo.offsetY = -this.capsuleInfo.halfHeight - this.capsuleInfo.radius + MODEL_OFFSET_Y;
 
         let rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-            .setTranslation(64.0, 40.0, 64.0)
+            .setTranslation(64.0, 64.0, 64.0)
             .setLinearDamping(0.1)
             .setAngularDamping(1.0);
 
@@ -138,7 +137,6 @@ export class Player {
 
         // apply velocity
         let targetSpeed = 0;
-            // Calculate movement direction and speed based on input
             this.direction.set(0, 0, 0);
             let direction = new THREE.Vector3();
 
@@ -230,7 +228,7 @@ export class Player {
                 currentAction.fadeOut(ANIM_FADE_DURATION);
             }
         }
-        // Skip reset/fade if it's the same action already playing correctly
+        // skip reset/fade if it's the same action playing
         else if (currentAction && currentAction === nextAction) {
             if (Math.abs(currentAction.getEffectiveTimeScale() - timeScale) > 0.01) {
                 currentAction.setEffectiveTimeScale(timeScale);
@@ -248,7 +246,6 @@ export class Player {
             .fadeIn(ANIM_FADE_DURATION)
             .play();
 
-        // handle loop behavior and state transitions
         let loopMode = THREE.LoopRepeat;
         let clamp = false;
         let nextStateOnFinish = 'Idle'; // always go back to Idle
@@ -266,7 +263,6 @@ export class Player {
                  loopMode = THREE.LoopRepeat;
                  break;
             default:
-                // console.warn(`Unhandled animation clip name "${name}" for loop/finish logic.`);
                 loopMode = THREE.LoopOnce;
                 clamp = true;
                 break;
@@ -275,7 +271,6 @@ export class Player {
         nextAction.setLoop(loopMode);
         nextAction.clampWhenFinished = clamp;
 
-        // listener for one shot animations (Jump, Wave)
         if (loopMode === THREE.LoopOnce) {
             this._animationListener = (event) => {
                 if (event.action === nextAction) {
@@ -290,17 +285,13 @@ export class Player {
                     }
 
                     // Only transition state if the state hasn't been changed
-                    // by player input *since this animation started*.
                     if (this.currentState === finishedState) {
-                         // console.log(`Animation clip '${name}' (state '${finishedState}') finished, transitioning to state '${nextStateOnFinish}'`);
 
-                         // Start the animation for the next state (Idle)
                          const nextAnimInfo = this._getAnimInfoForState(nextStateOnFinish);
                          this.playAnimation(nextAnimInfo.name, nextAnimInfo.timeScale);
                          this.currentState = nextStateOnFinish;
                     }
 
-                    // Clean up listener
                     if (this.mixer) this.mixer.removeEventListener('finished', this._animationListener);
                     this._animationListener = null;
                 }

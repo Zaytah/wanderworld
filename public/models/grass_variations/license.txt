@@ -1,0 +1,11 @@
+Model Information:
+* title:	Grass Variations
+* source:	https://sketchfab.com/3d-models/grass-variations-c84573687bf14f89938002df4ca0e696
+* author:	RBG_illustrations (https://sketchfab.com/RBG_illustrations)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Grass Variations" (https://sketchfab.com/3d-models/grass-variations-c84573687bf14f89938002df4ca0e696) by RBG_illustrations (https://sketchfab.com/RBG_illustrations) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

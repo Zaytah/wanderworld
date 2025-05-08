@@ -1,0 +1,11 @@
+Model Information:
+* title:	low poly rock pack
+* source:	https://sketchfab.com/3d-models/low-poly-rock-pack-cd3c0540db16478eab39b4b0c198606d
+* author:	sam (https://sketchfab.com/pigeons)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "low poly rock pack" (https://sketchfab.com/3d-models/low-poly-rock-pack-cd3c0540db16478eab39b4b0c198606d) by sam (https://sketchfab.com/pigeons) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

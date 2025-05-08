@@ -4,6 +4,9 @@ import WebGL from 'three/addons/capabilities/WebGL.js';
 import RAPIER from '@dimforge/rapier3d-compat'
 
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 import { ChunkManager } from './terrain.js';
 import { Player, InputController } from './utils.js';
@@ -11,10 +14,9 @@ import { ThirdPersonCamera } from './ThirdPersonCamera.js';
 
 const DEBUG = false;
 
-let scene, camera, renderer, world;
+let scene, camera, renderer, world, composer;
 let sky, sun, elevation, azimuth, hemisphereLight, directionalLight;
 let player, chunkManager, cameraSystem, input;
-let textures;
 let debugMaterial, debugGeometry, debugMesh;
 
 const clock = new THREE.Clock();
@@ -37,7 +39,7 @@ async function init() {
     renderer.setSize( window.innerWidth, window.innerHeight );
     document.body.appendChild( renderer.domElement );
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.5;
+    renderer.toneMappingExposure = 0.77;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -46,16 +48,15 @@ async function init() {
     const near = 0.1;
     const far = 5000;
     camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-    camera.position.set(-20, 10, 0);
 
     const gravity = new RAPIER.Vector3(0.0, -10, 0.0);
     world = new RAPIER.World(gravity);
 
     scene = new THREE.Scene();
 
-
     lighting();
     scenery();
+    postprocessing();
 }
 
 function lighting() {
@@ -64,7 +65,7 @@ function lighting() {
     scene.add(new THREE.AmbientLight(0xffffbb, 0.6));
     
     directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    console.log(directionalLight);
+    //console.log(directionalLight);
     directionalLight.position.set(100, 500, 100);
     directionalLight.castShadow = true;
     // shadow box
@@ -98,9 +99,7 @@ function lighting() {
     sun.setFromSphericalCoords( 1, phi, theta );
     sky.material.uniforms[ 'sunPosition' ].value.copy( sun );
     
-    
-    console.log(sky);
-    console.log(sky.material.uniforms);
+    //console.log(sky);
 
 }
 
@@ -124,13 +123,12 @@ async function scenery() {
         scene: scene,
         player: player,
         world: world,
-        textures: textures,
         lights: {directional: directionalLight, hemisphere: hemisphereLight}
     });
 
     try {
         await chunkManager.initialize();
-        console.log("Initial terrain generated.");
+        console.log("Terrain generated -- World starting.");
     } catch (error) {
         console.error("Failed to initialize ChunkManager. World cannot start.", error);
     }
@@ -157,6 +155,23 @@ async function scenery() {
 
 }
 
+// bloom effect
+function postprocessing() {
+
+    composer = new EffectComposer(renderer);
+    let renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+
+    let bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 1.5, 0.4, 0.85);
+
+    bloomPass.strength = 2.0;
+    bloomPass.radius = 0.1;
+    bloomPass.threshold = 0.3;
+}
+
 
 function animate() {
 
@@ -164,11 +179,12 @@ function animate() {
 
         const dt = clock.getDelta();
         world.step();
-        if (chunkManager) chunkManager.update();
+        if (chunkManager) chunkManager.update(dt);
         if (cameraSystem) cameraSystem.update(dt);
         if (player && player.mesh && player.playerBody) player.update(input, dt);
         animateSky();
-        renderer.render(scene, camera);
+        composer.render();
+        //renderer.render(scene, camera);
 
         if (DEBUG) {
             updateDebug();
@@ -178,7 +194,7 @@ function animate() {
 
 function animateSky() {
     const time = clock.getElapsedTime();
-    const dayLength = 9; // in seconds
+    const dayLength = 240; // in seconds
 
     const t = (time % dayLength) / dayLength; // in-game 'time' in range [0,1]
 
@@ -205,7 +221,6 @@ function animateSky() {
         directionalLight.position.copy(sun).multiplyScalar(100);
     }
 
-    // move with player to keep world 'infinite'
 }
 
 window.addEventListener('click', () => {

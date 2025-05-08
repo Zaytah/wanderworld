@@ -5,17 +5,18 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { Water } from 'three/examples/jsm/objects/Water.js';
 import terrainVertexShader from './shaders/terrainVertexShader.glsl';
 import terrainFragShader from './shaders/terrainFragShader.glsl';
-import { BIOME_ID } from './noise.js';
+import { EntityManager } from './entityManager.js';
 
 const RESOLUTION = 64;
 const CHUNK_SIZE = 128; // better performance to increase this than render distance
-const MAX_CHUNKS_PER_FRAME = 1;
+const MAX_CHUNKS_PER_FRAME = 2;
 
 const loader = new THREE.TextureLoader();
 let grassTexture = null;
 let rockTexture = null;
 let snowTexture = null;
 let sandTexture = null;
+let dryBasinTexture = null;
 let waterNormalsMap = null;
 
 export class TerrainChunk {
@@ -50,28 +51,23 @@ export class TerrainChunk {
         }
 
         // Create visual mesh
-        const material = new THREE.MeshStandardMaterial({
-            side: THREE.FrontSide,
-            map: grassTexture,
-            color: new THREE.Color(1.2, 1.2, 1.2)
-        });
+        //const material = new THREE.MeshStandardMaterial({ side: THREE.FrontSide, map: grassTexture, color: new THREE.Color(1.2, 1.2, 1.2) });
 
         const ambientColor = this.lights.hemisphere ? this.lights.hemisphere.color.clone() : new THREE.Color(0x404040);
         const dirLightColor = this.lights.directional ? this.lights.directional.color.clone() : new THREE.Color(0xffffff);
-        // Calculate direction TO the light source (assuming light position points FROM origin)
         const dirLightDir = this.lights.directional ? this.lights.directional.position.clone().normalize() : new THREE.Vector3(0, 1, 0);
 
         const shaderMaterial = new THREE.ShaderMaterial({
             uniforms: {
-                grassTexture: { value: grassTexture },
+                    grassTexture: { value: grassTexture },
                     rockTexture: { value: rockTexture },
                     snowTexture: { value: snowTexture },
                     sandTexture: { value: sandTexture },
-
+                    dryBasinTexture: { value: dryBasinTexture },
                     ambientLightColor: { value: ambientColor },
                     directionalLightDirection: { value: dirLightDir },
-                    directionalLightColor: { value: dirLightColor }
-            },
+                    directionalLightColor: { value: dirLightColor },
+                },
             vertexShader: terrainVertexShader,
             fragmentShader: terrainFragShader,
             side: THREE.FrontSide
@@ -88,7 +84,7 @@ export class TerrainChunk {
 
         // Water
         let hasWater = false;
-        const WATER_LEVEL = 0.5;
+        const WATER_LEVEL = -5.0;
         let minHeightInChunk = Infinity;
         for (let i = 1; i < positions.length; i+=3) {
             minHeightInChunk = Math.min(minHeightInChunk, positions[i]);
@@ -98,7 +94,9 @@ export class TerrainChunk {
             let waterGeometry = new THREE.PlaneGeometry(this.chunkSize, this.chunkSize);
 
             if (!waterNormalsMap) console.error("Water normals texture not loaded.");
-
+            
+            // USE FOR BETTER QUALITY WATER
+            /*
             this.water = new Water(
                 waterGeometry,
                 {
@@ -112,7 +110,26 @@ export class TerrainChunk {
                     //fog: this.scene.fog !== undefined // Use scene fog if available
                 }
             );
+            */
 
+            // USE FOR BETTER PERFORMANCE
+            let waterMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0x2389da,
+                metalness: 0.0,     
+                roughness: 0.09,     
+                transmission: 0.85,  
+                transparent: true,  
+                opacity: 0.88,     
+                ior: 1.333,         
+                side: THREE.DoubleSide,
+                depthWrite: false,  
+                reflectivity: 0.7,   
+                clearcoat: 0.5,      
+                clearcoatRoughness: 0.1
+            });
+
+            this.water = new THREE.Mesh(waterGeometry, waterMaterial);
+            
             this.water.rotation.x = - Math.PI / 2;
             this.water.position.set(chunkOffsetX, WATER_LEVEL - 0.05, chunkOffsetZ);
 
@@ -179,8 +196,15 @@ export class ChunkManager {
         this.creationQueue = []; // holds chunkData received from worker
         this.destructionQueue = []; // holds chunk keys to be destroyed
 
+        // physics
         this.staticBody = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
         if (this.scene) this.scene.add(this.group);
+
+        this.entityManager = new EntityManager({
+            scene: params.scene,
+            world: params.world,
+            chunkSize: this.chunkSize
+       });
     }
 
     async initialize() {
@@ -189,25 +213,29 @@ export class ChunkManager {
         console.log("ChunkManager: Initializing.");
 
         try {
+            await this.entityManager.initialize();
+
             const texturePaths = [
                 './public/assets/grass_with_rocks_01_1k/grass_with_rocks_01_color_1k.png', // grass
-                './public/assets/ground_with_rocks_03_1k/ground_with_rocks_03_color_1k.png', // rock
+                //'./public/assets/ground_tiles_01_1k/ground_tiles_01_color_1k.png', // rock
+                './public/assets/cliff_rocks_01_1k/cliff_rocks_01_color_1k_adjusted2.png',
                 './public/assets/sand_04_1k/sand_04_color_1k.png', // sand
                 './public/assets/snow_01_1k/snow_01_color_1k.png', // snow
+                './public/assets/ground_with_rocks_03_1k/ground_with_rocks_03_color_1k.png', // basin
                 './public/assets/simple-ocean-normal-map.jpeg' // water
             ]
 
             const texturePromises = texturePaths.map(path => {
-                console.log(`Attempting to load: ${path}`);
                 return loader.loadAsync(path).catch(err => {
-                    console.error(`Failed to load texture: ${path}`, err);
+                    console.warn(`Failed to load texture: ${path}`, err);
                     return null;
                 });
             });
 
             const loadedTextures = await Promise.all(texturePromises);
             
-            loadedTextures.forEach((tex, index) => {
+            // i dont think this does anything anymore
+            loadedTextures.forEach((tex) => {
                 if(tex) {
                     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
                     tex.repeat.set(16, 16);
@@ -221,9 +249,10 @@ export class ChunkManager {
            rockTexture = loadedTextures[1];
            sandTexture = loadedTextures[2];
            snowTexture = loadedTextures[3];
-           waterNormalsMap = loadedTextures[4];
+           dryBasinTexture = loadedTextures[4];
+           waterNormalsMap = loadedTextures[5];
 
-            // Web Worker
+            // Web Worker for calculations
             console.log("ChunkManager: Initializing terrain worker.");
             this.worker = new Worker(new URL('./terrainWorker.js', import.meta.url), { type: 'module' });
 
@@ -232,7 +261,7 @@ export class ChunkManager {
                 const chunkData = event.data;
                 const key = this.getChunkKey(chunkData.chunkX, chunkData.chunkZ);
 
-                // Add received data to creation queue 
+                // add received data to creation queue 
                 if (this.pendingChunks.has(key)) {
                     this.creationQueue.push(chunkData);
                 }
@@ -246,7 +275,6 @@ export class ChunkManager {
                     this.worker = null;
                 }
             };
-            console.log("ChunkManager: Terrain worker initialized.");
 
             // worker is ready to receive requests
             this.isInitialized = true;
@@ -315,27 +343,29 @@ export class ChunkManager {
 
          // queue unnecessary chunks for destruction
          for (let key of this.chunks.keys()) {
-             if (!neededChunks.has(key)) {
-                 if (!this.destructionQueue.includes(key)) {
-                     this.destructionQueue.push(key);
-                 }
-             }
-         }
+            if (!neededChunks.has(key)) {
+                if (!this.destructionQueue.includes(key)) {
+                    this.destructionQueue.push(key);
+                }
+                if(this.entityManager) this.entityManager.removeDetailsForChunk(key);
+            }
+        }
 
-         // cancel pending generation for chunks that are no longer needed
-         const pendingToRemove = [];
-         for (let key of this.pendingChunks) {
-              if (!neededChunks.has(key)) {
-                  const queueIndex = this.creationQueue.findIndex(data => this.getChunkKey(data.chunkX, data.chunkZ) === key);
-                  if (queueIndex !== -1) {
-                      this.creationQueue.splice(queueIndex, 1);
-                  }
-                  pendingToRemove.push(key);
-              }
-         }
-          for (const key of pendingToRemove) {
-              this.pendingChunks.delete(key);
-          }
+        // cancel pending generation for chunks that are no longer needed
+        const pendingToRemove = [];
+        for (let key of this.pendingChunks) {
+            if (!neededChunks.has(key)) {
+                const queueIndex = this.creationQueue.findIndex(data => this.getChunkKey(data.chunkX, data.chunkZ) === key);
+                if (queueIndex !== -1) {
+                    this.creationQueue.splice(queueIndex, 1);
+                }
+                pendingToRemove.push(key);
+            }
+        }
+        
+        for (const key of pendingToRemove) {
+            this.pendingChunks.delete(key);
+        }
     }
 
     processQueues() {
@@ -345,6 +375,7 @@ export class ChunkManager {
         let createdCount = 0;
         while (this.creationQueue.length > 0 && createdCount < MAX_CHUNKS_PER_FRAME) {
             const chunkData = this.creationQueue.shift();
+            chunkData.res = RESOLUTION;
             const key = this.getChunkKey(chunkData.chunkX, chunkData.chunkZ);
 
             if (this.pendingChunks.has(key) && !this.chunks.has(key) && !this.destructionQueue.includes(key)) {
@@ -365,6 +396,7 @@ export class ChunkManager {
                      this.pendingChunks.delete(key);
                  }
             }
+            if (this.entityManager) this.entityManager.addDetailsForChunk(chunkData);
         }
 
         // process destruction queue
@@ -380,10 +412,14 @@ export class ChunkManager {
         }
     }
 
-    update() {
+    update(dt) {
         if (this.isInitialized) {
             this.checkForNeededChunks();
             this.processQueues();
+            if (this.entityManager && this.player) {
+                this.entityManager.update(dt, this.player.getPosition());
+
+            }
         }
     }
 
@@ -394,24 +430,5 @@ export class ChunkManager {
 
     getChunkKey(x, z) {
         return `${x},${z}`;
-    }
-
-    // weird behavior without this sometimes
-    free() {
-        if (this.worker) {
-            this.worker.terminate();
-            this.worker = null;
-        }
-        for (let chunk of this.chunks.values()) {
-             chunk.destroy();
-        }
-        this.chunks.clear();
-        this.pendingChunks.clear();
-        this.creationQueue = [];
-        this.destructionQueue = [];
-        if(this.group.parent) {
-            this.group.parent.remove(this.group);
-        }
-        this.isInitialized = false;
     }
 }

@@ -1,0 +1,11 @@
+Model Information:
+* title:	Low poly deer
+* source:	https://sketchfab.com/3d-models/low-poly-deer-b1282c04dffd4a44a8d755171337e143
+* author:	Tin3D (https://sketchfab.com/Tin3D)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Low poly deer" (https://sketchfab.com/3d-models/low-poly-deer-b1282c04dffd4a44a8d755171337e143) by Tin3D (https://sketchfab.com/Tin3D) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
