@@ -6,7 +6,9 @@ Wanderworld - Infinite Procedural Generation
 > Basic WASD controls and camera movement with pointer lock (click to lock mouse in window, 'esc' to exit)
 
 >'R' to sprint (can change 'SPRINT_SPEED' constant at top of utils.js)
- 
+note: sometimes if character velocity is too high with high 'SPRINT_SPEED' values you will go through the colliders in the physics engine and can end up under the map or stuck inside the terrain.
+
+
 > 'Space' to jump (can hold space to continously jump and keep flying to travel around faster)
 
 > 'G' to wave (built-in animation in character model)
