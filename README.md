@@ -1,6 +1,5 @@
-Wanderworld - Infinite Procedural Generation
+Wanderworld - Infinite Procedural Generation with Chunk Based Rendering
 -- Three.js, Rapier.js
--- Chunk Based Rendering
 --
 
 > Basic WASD controls and camera movement with pointer lock (click to lock mouse in window, 'esc' to exit)
